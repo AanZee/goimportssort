@@ -14,8 +14,8 @@ import (
 	"bitbucket.org/example/package/name3"
 	"bitbucket.org/example/package/name4"
 
-	"github.com/AanZee/go-imports-sort/package1"
-	"github.com/AanZee/go-imports-sort/package2"
+	"github.com/AanZee/goimportssort/package1"
+	"github.com/AanZee/goimportssort/package2"
 )
 
 func main() {

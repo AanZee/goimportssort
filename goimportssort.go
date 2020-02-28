@@ -27,6 +27,22 @@ var (
 	verbose     bool // verbose logging
 )
 
+
+// ImpModel is used for storing import information
+type impModel struct {
+	path           string
+	localReference string
+}
+
+// String is used to get a string representation of an import
+func (m impModel) String() string {
+	if m.localReference == "" {
+		return m.path
+	}
+
+	return m.localReference + " " + m.path
+}
+
 // main is the entry point of the program
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -192,7 +208,7 @@ func replaceImports(src, newImports []byte) []byte {
 }
 
 // sortImports sorts multiple imports by import name & prefix
-func sortImports(imports [][]ImpModel) [][]ImpModel {
+func sortImports(imports [][]impModel) [][]impModel {
 	for x := 0; x < len(imports); x++ {
 		sort.Slice(imports[x], func(i, j int) bool {
 			if imports[x][i].path != imports[x][j].path {
@@ -207,7 +223,7 @@ func sortImports(imports [][]ImpModel) [][]ImpModel {
 }
 
 // convertImportsToGo generates output for correct categorised import statements
-func convertImportsToGo(imports [][]ImpModel) []byte {
+func convertImportsToGo(imports [][]impModel) []byte {
 	output := "import ("
 
 	for i := 0; i < len(imports); i++ {
@@ -223,8 +239,8 @@ func convertImportsToGo(imports [][]ImpModel) []byte {
 }
 
 // convertImportsToSlice parses the file with AST and gets all imports
-func convertImportsToSlice(node *ast.File) ([][]ImpModel, error) {
-	importCategories := make([][]ImpModel, 3)
+func convertImportsToSlice(node *ast.File) ([][]impModel, error) {
+	importCategories := make([][]impModel, 3)
 
 	for _, decl := range node.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
@@ -236,7 +252,7 @@ func convertImportsToSlice(node *ast.File) ([][]ImpModel, error) {
 			impName := importSpec.Path.Value
 			locName := importSpec.Name
 
-			var impModel ImpModel
+			var impModel impModel
 			if locName != nil {
 				impModel.localReference = locName.Name
 			}
