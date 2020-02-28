@@ -1,4 +1,4 @@
-# sort
+# go-imports-sort
 This tool aims to automatically fix the order of golang imports. It will split your imports into three categories.
 
 ## Installation
