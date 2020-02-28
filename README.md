@@ -1,5 +1,5 @@
 # go-imports-sort
-This tool aims to automatically fix the order of golang imports. It will split your imports in three categories.
+This tool aims to automatically fix the order of golang imports. It will split your imports into three categories.
 
 ## Installation
 ```
@@ -9,7 +9,7 @@ $ go get github.com/AanZee/go-imports-sort
 ## Usage
 Imports will be sorted according to their categories.
 ```
-$ goimportsort -v -l --local "github.com/AanZee/go-imports-sort" example.go
+$ goimportssort -v -l --local "github.com/AanZee/go-imports-sort" example.go
 ```
 
 For example:
