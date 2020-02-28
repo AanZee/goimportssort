@@ -7,6 +7,14 @@ $ go get github.com/AanZee/go-imports-sort
 ```
 
 ## Usage
+```
+usage: goimportssort [flags] [path ...]
+  -l    write results to stdout
+  -local string
+        put imports beginning with this string after 3rd-party packages; comma-separated list
+  -v    verbose logging
+  -w    write result to (source) file instead of stdout (default true)
+```
 Imports will be sorted according to their categories.
 ```
 $ goimportssort -v -l --local "github.com/AanZee/go-imports-sort" example.go

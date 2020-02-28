@@ -40,7 +40,7 @@ func main() {
 // goImportsSortMain checks passed flags and starts processing files
 func goImportsSortMain() error {
 	flag.Usage = func () {
-		_, _ = fmt.Fprintf(os.Stderr, "usage: goimportsort [flags] [path ...]\n")
+		_, _ = fmt.Fprintf(os.Stderr, "usage: goimportssort [flags] [path ...]\n")
 		flag.PrintDefaults()
 		os.Exit(2)
 	}
