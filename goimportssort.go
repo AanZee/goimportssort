@@ -175,6 +175,7 @@ func processFile(filename string, in io.Reader, out io.Writer) ([]byte, error) {
 	return res, err
 }
 
+// closeFile tries to close a File and prints an error when it can't
 func closeFile(file *os.File) {
 	err := file.Close()
 	if err != nil {
@@ -277,6 +278,7 @@ func convertImportsToGo(imports [][]impModel) []byte {
 	return []byte(output)
 }
 
+// countImports count the total number of imports of a [][]impModel
 func countImports(impModels [][]impModel) int {
 	count := 0
 	for i := 0; i < len(impModels); i++ {
@@ -312,6 +314,7 @@ func convertImportsToSlice(node *dst.File) ([][]impModel, error) {
 	return importCategories, nil
 }
 
+// loadStandardPackages tries to fetch all golang std packages
 func loadStandardPackages() error {
 	pkgs, err := packages.Load(nil, "std")
 	if err == nil {
@@ -323,6 +326,7 @@ func loadStandardPackages() error {
 	return err
 }
 
+// isStandardPackage checks if a package string is included in the standardPackages map
 func isStandardPackage(pkg string) bool {
 	_, ok := standardPackages[pkg]
 	return ok
