@@ -5,24 +5,25 @@ package main
 // local
 import (
 	"fmt"
-	"fmt2"
-
 	"log"
 
-
-	APZ "bitbucket.org/example/package/name"
 	APA "bitbucket.org/example/package/name"
+	APZ "bitbucket.org/example/package/name"
 	"bitbucket.org/example/package/name2"
-
-
+	"bitbucket.org/example/package/name3" // foopsie
 	"bitbucket.org/example/package/name4"
-	"bitbucket.org/example/package/name3"
-
 
 	"github.com/AanZee/goimportssort/package1"
-
+	// a
 	"github.com/AanZee/goimportssort/package2"
+
+	/*
+	mijn comment
+	*/
+	"net/http/httptest"
+	"database/sql/driver"
 )
+// klaslkasdko
 
 func main() {
 	fmt.Println("Hello!")

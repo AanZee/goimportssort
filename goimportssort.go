@@ -10,28 +10,31 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"go/ast"
 	"go/parser"
 	"go/token"
+	"golang.org/x/tools/go/packages"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/dave/dst"
+	"github.com/dave/dst/decorator"
+	"github.com/dave/dst/dstutil"
 )
 
 var (
 	list        = flag.Bool("l", false, "write results to stdout")
-	write       = flag.Bool("w", true, "write result to (source) file instead of stdout")
+	write       = flag.Bool("w", false, "write result to (source) file instead of stdout")
 	localPrefix = flag.String("local", "", "put imports beginning with this string after 3rd-party packages; comma-separated list")
 	verbose     bool // verbose logging
+	standardPackages = make(map[string]struct{})
 )
-
 
 // ImpModel is used for storing import information
 type impModel struct {
@@ -40,7 +43,7 @@ type impModel struct {
 }
 
 // String is used to get a string representation of an import
-func (m impModel) String() string {
+func (m impModel) string() string {
 	if m.localReference == "" {
 		return m.path
 	}
@@ -60,7 +63,7 @@ func main() {
 
 // goImportsSortMain checks passed flags and starts processing files
 func goImportsSortMain() error {
-	flag.Usage = func () {
+	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, "usage: goimportssort [flags] [path ...]\n")
 		flag.PrintDefaults()
 		os.Exit(2)
@@ -74,13 +77,13 @@ func goImportsSortMain() error {
 	}
 
 	if *localPrefix == "" {
-		log.Println("No prefix found, using module name")
+		log.Println("no prefix found, using module name")
 
 		moduleName, _ := getModuleName()
 		if moduleName != "" {
 			localPrefix = &moduleName
 		} else {
-			log.Println("Module name not found. Skipping localPrefix")
+			log.Println("module name not found. skipping localprefix")
 		}
 	}
 
@@ -120,7 +123,7 @@ func isGoFile(f os.FileInfo) bool {
 
 // walkDir walks through a path, processing all go files recursively in a directory
 func walkDir(path string) error {
-	return filepath.Walk(path, func (path string, f os.FileInfo, err error) error {
+	return filepath.Walk(path, func(path string, f os.FileInfo, err error) error {
 		if err == nil && isGoFile(f) {
 			_, err = processFile(path, nil, os.Stdout)
 		}
@@ -130,14 +133,14 @@ func walkDir(path string) error {
 
 // processFile reads a file and processes the content, then checks if they're equal.
 func processFile(filename string, in io.Reader, out io.Writer) ([]byte, error) {
-	log.Printf("Processing %v\n", filename)
+	log.Printf("processing %v\n", filename)
 
 	if in == nil {
 		f, err := os.Open(filename)
 		if err != nil {
 			return nil, err
 		}
-		defer f.Close()
+		defer closeFile(f)
 		in = f
 	}
 
@@ -166,50 +169,80 @@ func processFile(filename string, in io.Reader, out io.Writer) ([]byte, error) {
 			return res, nil
 		}
 	} else {
-		log.Println("File has not been changed.")
+		log.Println("file has not been changed")
 	}
 
-	return nil, err
+	return res, err
+}
+
+func closeFile(file *os.File) {
+	err := file.Close()
+	if err != nil {
+		log.Println("could not close file")
+	}
 }
 
 // process processes the source of a file, categorising the imports
-func process(src []byte) (formatted []byte, err error) {
-	fileSet := token.NewFileSet()
-	node, err := parser.ParseFile(fileSet, "", src, parser.ParseComments)
-	if err != nil {
-		return nil, err
+func process(src []byte) (output []byte, err error) {
+	var (
+		fileSet          = token.NewFileSet()
+		convertedImports [][]impModel
+		node             *dst.File
+	)
+
+	err = loadStandardPackages()
+	if err == nil {
+		node, err = decorator.ParseFile(fileSet, "", src, parser.ParseComments)
+	}
+	if err == nil {
+		convertedImports, err = convertImportsToSlice(node)
 	}
 
-	convertedImports, err := convertImportsToSlice(node)
-	sortedImports := sortImports(convertedImports)
-	convertedToGo := convertImportsToGo(sortedImports)
+	if err == nil {
+		if countImports(convertedImports) == 0 {
+			return src, err
+		}
+	}
 
-	output := replaceImports(src, convertedToGo)
+	if err == nil {
+		sortedImports := sortImports(convertedImports)
+		convertedToGo := convertImportsToGo(sortedImports)
+		output, err = replaceImports(convertedToGo, node)
+	}
 
 	return output, err
 }
 
 // replaceImports replaces existing imports and handles multiple import statements
-func replaceImports(src, newImports []byte) []byte {
-	// remove single imports
-	output := regexp.MustCompile(`(?U)import ".*"`).ReplaceAll(src, []byte{})
+func replaceImports(newImports []byte, node *dst.File) ([]byte, error) {
+	var (
+		output []byte
+		err error
+		buf bytes.Buffer
+	)
 
-	// replace first long import with the sorted imports
-	var findMultipleImports = regexp.MustCompile(`(?sU)import \(.*\)`)
-	output = bytes.Replace(output, findMultipleImports.Find(output), newImports, 1)
+	// remove + update
+	dstutil.Apply(node, func(cr *dstutil.Cursor) bool {
+		n := cr.Node()
 
-	// remove any additional long import blocks, skip the first one
-	allMatches := findMultipleImports.FindAll(output, -1)
-	if len(allMatches) > 1 {
-		for i := 0; i < (len(allMatches) - 1); i++ {
-			output = bytes.Replace(output, allMatches[i+1], []byte{}, 1)
+		if decl, ok := n.(*dst.GenDecl); ok && decl.Tok == token.IMPORT {
+			cr.Delete()
 		}
+
+		return true
+	}, nil)
+
+	err = decorator.Fprint(&buf, node)
+
+	if err == nil {
+		packageName := node.Name.Name
+		output = bytes.Replace(buf.Bytes(), []byte("package "+packageName), append([]byte("package "+packageName+"\n\n"), newImports...), 1)
+	} else {
+		fmt.Println("err not nil:")
+		fmt.Println(err)
 	}
 
-	// clear additional whitespace
-	output = regexp.MustCompile(`\n{2,}`).ReplaceAll(output, []byte("\n\n")) // TODO: do not replace all whitespace
-
-	return output
+	return output, err
 }
 
 // sortImports sorts multiple imports by import name & prefix
@@ -230,50 +263,69 @@ func sortImports(imports [][]impModel) [][]impModel {
 // convertImportsToGo generates output for correct categorised import statements
 func convertImportsToGo(imports [][]impModel) []byte {
 	output := "import ("
-
 	for i := 0; i < len(imports); i++ {
+		if len(imports[i]) == 0 {
+			continue
+		}
 		output += "\n"
 		for _, imp := range imports[i] {
-			output += fmt.Sprintf("\t%v\n", imp.String())
+			output += fmt.Sprintf("\t%v\n", imp.string())
 		}
 	}
-
 	output += ")"
 
 	return []byte(output)
 }
 
+func countImports(impModels [][]impModel) int {
+	count := 0
+	for i := 0; i < len(impModels); i++ {
+		count += len(impModels[i])
+	}
+	return count
+}
+
 // convertImportsToSlice parses the file with AST and gets all imports
-func convertImportsToSlice(node *ast.File) ([][]impModel, error) {
+func convertImportsToSlice(node *dst.File) ([][]impModel, error) {
 	importCategories := make([][]impModel, 3)
 
-	for _, decl := range node.Decls {
-		genDecl, ok := decl.(*ast.GenDecl)
-		if !ok || genDecl.Tok != token.IMPORT {
-			continue
+	for _, importSpec := range node.Imports {
+		impName := importSpec.Path.Value
+		impNameWithoutQuotes := strings.Trim(impName, "\"")
+		locName := importSpec.Name
+
+		var locImpModel impModel
+		if locName != nil {
+			locImpModel.localReference = locName.Name
 		}
-		for _, spec := range genDecl.Specs {
-			importSpec := spec.(*ast.ImportSpec)
-			impName := importSpec.Path.Value
-			locName := importSpec.Name
+		locImpModel.path = impName
 
-			var impModel impModel
-			if locName != nil {
-				impModel.localReference = locName.Name
-			}
-			impModel.path = impName
-
-			if *localPrefix != "" && strings.Count(impName, *localPrefix) > 0 { // TODO: Support multiple local packages
-				importCategories[2] = append(importCategories[2], impModel)
-			} else if strings.Count(impName, "/") <= 1 {
-				importCategories[0] = append(importCategories[0], impModel)
-			} else {
-				importCategories[1] = append(importCategories[1], impModel)
-			}
+		if *localPrefix != "" && strings.Count(impName, *localPrefix) > 0 {
+			importCategories[2] = append(importCategories[2], locImpModel)
+		} else if isStandardPackage(impNameWithoutQuotes) {
+			importCategories[0] = append(importCategories[0], locImpModel)
+		} else {
+			importCategories[1] = append(importCategories[1], locImpModel)
 		}
 	}
 
 	return importCategories, nil
+}
+
+func loadStandardPackages() error {
+	pkgs, err := packages.Load(nil, "std")
+	if err == nil {
+		for _, p := range pkgs {
+			standardPackages[p.PkgPath] = struct{}{}
+		}
+	}
+
+	return err
+}
+
+func isStandardPackage(pkg string) bool {
+	_, ok := standardPackages[pkg]
+	return ok
 }
 
 // getModuleName parses the GOMOD name
@@ -281,7 +333,7 @@ func getModuleName() (string, error) {
 	gomodCmd := exec.Command("go", "env", "GOMOD") // TODO: Check if there's a better way to get GOMOD
 	gomod, err := gomodCmd.Output()
 	if err != nil {
-		log.Println("Could not run: go env GOMOD")
+		log.Println("could not run: go env GOMOD")
 		return "", err
 	}
 	gomodStr := strings.TrimSpace(string(gomod))

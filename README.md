@@ -13,7 +13,7 @@ usage: goimportssort [flags] [path ...]
   -local string
         put imports beginning with this string after 3rd-party packages; comma-separated list
   -v    verbose logging
-  -w    write result to (source) file instead of stdout (default true)
+  -w    write result to (source) file instead of stdout
 ```
 Imports will be sorted according to their categories.
 ```
@@ -33,7 +33,7 @@ import (
 	"github.com/AanZee/goimportssort/package1"
 )
 import (
-	"fmt2"
+	"net/http/httptest"
 )
 
 import "bitbucket.org/example/package/name2"
@@ -48,8 +48,8 @@ package main
 
 import (
     "fmt"
-    "fmt2"
     "log"
+    "net/http/httptest"
 
     APA "bitbucket.org/example/package/name"
     APZ "bitbucket.org/example/package/name"
