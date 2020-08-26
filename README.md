@@ -3,21 +3,22 @@ This tool aims to automatically fix the order of golang imports. It will split y
 
 ## Installation
 ```
-$ go get github.com/AanZee/goimportssort
+$ go get -u github.com/AanZee/goimportssort
 ```
 
 ## Usage
 ```
 usage: goimportssort [flags] [path ...]
-  -l    write results to stdout
+  -l    write results to stdout (default false)
   -local string
-        put imports beginning with this string after 3rd-party packages; comma-separated list
-  -v    verbose logging
-  -w    write result to (source) file instead of stdout
+        put imports beginning with this string after 3rd-party packages; comma-separated list 
+(default tries to get module name of current directory)
+  -v    verbose logging (default false)
+  -w    write result to (source) file (default false)
 ```
 Imports will be sorted according to their categories.
 ```
-$ goimportssort -v -l --local "github.com/AanZee/goimportssort" example.go
+$ goimportssort -v -w ./..
 ```
 
 For example:

@@ -1,7 +1,6 @@
 /*
 goimportssort sorts your Go import lines in three categories: inbuilt, external and local.
-     $ go get github.com/AanZee/goimportssort
-Happy hacking!
+     $ go get -u github.com/AanZee/goimportssort
 */
 package main
 
@@ -12,16 +11,17 @@ import (
 	"fmt"
 	"go/parser"
 	"go/token"
-	"golang.org/x/tools/go/packages"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
+
+	"golang.org/x/mod/modfile"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
@@ -29,20 +29,20 @@ import (
 )
 
 var (
-	list        = flag.Bool("l", false, "write results to stdout")
-	write       = flag.Bool("w", false, "write result to (source) file instead of stdout")
-	localPrefix = flag.String("local", "", "put imports beginning with this string after 3rd-party packages; comma-separated list")
-	verbose     bool // verbose logging
+	list             = flag.Bool("l", false, "write results to stdout")
+	write            = flag.Bool("w", false, "write result to (source) file instead of stdout")
+	localPrefix      = flag.String("local", "", "put imports beginning with this string after 3rd-party packages; comma-separated list")
+	verbose          bool // verbose logging
 	standardPackages = make(map[string]struct{})
 )
 
-// ImpModel is used for storing import information
+// impModel is used for storing import information
 type impModel struct {
 	path           string
 	localReference string
 }
 
-// String is used to get a string representation of an import
+// string is used to get a string representation of an import
 func (m impModel) string() string {
 	if m.localReference == "" {
 		return m.path
@@ -79,7 +79,7 @@ func goImportsSortMain() error {
 	if *localPrefix == "" {
 		log.Println("no prefix found, using module name")
 
-		moduleName, _ := getModuleName()
+		moduleName := getModuleName()
 		if moduleName != "" {
 			localPrefix = &moduleName
 		} else {
@@ -218,8 +218,8 @@ func process(src []byte) (output []byte, err error) {
 func replaceImports(newImports []byte, node *dst.File) ([]byte, error) {
 	var (
 		output []byte
-		err error
-		buf bytes.Buffer
+		err    error
+		buf    bytes.Buffer
 	)
 
 	// remove + update
@@ -239,8 +239,7 @@ func replaceImports(newImports []byte, node *dst.File) ([]byte, error) {
 		packageName := node.Name.Name
 		output = bytes.Replace(buf.Bytes(), []byte("package "+packageName), append([]byte("package "+packageName+"\n\n"), newImports...), 1)
 	} else {
-		fmt.Println("err not nil:")
-		fmt.Println(err)
+		log.Println(err)
 	}
 
 	return output, err
@@ -332,22 +331,31 @@ func isStandardPackage(pkg string) bool {
 	return ok
 }
 
+func getRootPath() (string, error) {
+	_, b, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", errors.New("could not get root directory")
+	}
+	basepath := filepath.Dir(b)
+
+	return basepath, nil
+}
+
 // getModuleName parses the GOMOD name
-func getModuleName() (string, error) {
-	gomodCmd := exec.Command("go", "env", "GOMOD") // TODO: Check if there's a better way to get GOMOD
-	gomod, err := gomodCmd.Output()
+func getModuleName() string {
+	root, err := getRootPath()
 	if err != nil {
-		log.Println("could not run: go env GOMOD")
-		return "", err
+		log.Println("error when getting root path: ", err)
+		return ""
 	}
-	gomodStr := strings.TrimSpace(string(gomod))
 
-	moduleCmd := exec.Command("awk", "/module/ {print $2}", gomodStr) // TODO: Check if there's a better way
-	module, err := moduleCmd.Output()
+	goModBytes, err := ioutil.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
-		return "", err
+		log.Println("error when reading mod file: ", err)
+		return ""
 	}
-	moduleStr := strings.TrimSpace(string(module))
 
-	return moduleStr, nil
+	modName := modfile.ModulePath(goModBytes)
+
+	return modName
 }

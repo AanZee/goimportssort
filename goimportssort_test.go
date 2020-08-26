@@ -10,6 +10,36 @@ import (
 func TestProcessFile(t *testing.T) {
 	asserts := assert.New(t)
 	*localPrefix = "github.com/AanZee/goimportssort"
+	reader := strings.NewReader(`package main
+
+// builtin
+// external
+// local
+import (
+	"fmt"
+	"log"
+	
+	APA "bitbucket.org/example/package/name"
+	APZ "bitbucket.org/example/package/name"
+	"bitbucket.org/example/package/name2"
+	"bitbucket.org/example/package/name3" // foopsie
+	"bitbucket.org/example/package/name4"
+	
+	"github.com/AanZee/goimportssort/package1"
+	// a
+	"github.com/AanZee/goimportssort/package2"
+	
+	/*
+		mijn comment
+	*/
+	"net/http/httptest"
+	"database/sql/driver"
+)
+// klaslkasdko
+
+func main() {
+	fmt.Println("Hello!")
+}`)
 	want := `package main
 
 import (
@@ -33,7 +63,7 @@ func main() {
 }
 `
 
-	output, err := processFile("_fixtures/sample3.txt", nil, os.Stdout)
+	output, err := processFile("", reader, os.Stdout)
 	asserts.NotEqual(nil, output)
 	asserts.Equal(nil, err)
 	asserts.Equal(want, string(output))
@@ -44,7 +74,7 @@ func TestProcessFile_SingleImport(t *testing.T) {
 	*localPrefix = "github.com/AanZee/goimportssort"
 
 	reader := strings.NewReader(
-`package main
+		`package main
 
 
 import "github.com/AanZee/goimportssort/package1"
@@ -57,7 +87,7 @@ func main() {
 	asserts.NotEqual(nil, output)
 	asserts.Equal(nil, err)
 	asserts.Equal(
-`package main
+		`package main
 
 import (
 	"github.com/AanZee/goimportssort/package1"
@@ -129,4 +159,48 @@ import (
 	"github.com/AanZee/goimportssort/package2"
 )
 `, string(output))
+}
+
+func TestProcessFile_WronglyFormattedGo(t *testing.T) {
+	asserts := assert.New(t)
+	*localPrefix = "github.com/AanZee/goimportssort"
+
+	reader := strings.NewReader(
+		`import "github.com/AanZee/goimportssort/package1"
+
+
+func main() {
+	fmt.Println("Hello!")
+}`)
+	output, err := processFile("", reader, os.Stdout)
+	asserts.NotEqual(nil, output)
+	asserts.Equal(nil, err)
+	asserts.Equal(
+		`package main
+
+import (
+	"github.com/AanZee/goimportssort/package1"
+)
+
+func main() {
+	fmt.Println("Hello!")
+}
+`, string(output))
+}
+
+func TestGetRootPath(t *testing.T) {
+	asserts := assert.New(t)
+
+	path, err := getRootPath()
+
+	asserts.Nil(err)
+	asserts.Contains(path, "/goimportssort")
+}
+
+func TestGetModuleName(t *testing.T) {
+	asserts := assert.New(t)
+
+	name := getModuleName()
+
+	asserts.Equal("github.com/AanZee/goimportssort", name)
 }
