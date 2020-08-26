@@ -331,19 +331,9 @@ func isStandardPackage(pkg string) bool {
 	return ok
 }
 
-func getRootPath() (string, error) {
-	_, b, _, ok := runtime.Caller(0)
-	if !ok {
-		return "", errors.New("could not get root directory")
-	}
-	basepath := filepath.Dir(b)
-
-	return basepath, nil
-}
-
 // getModuleName parses the GOMOD name
 func getModuleName() string {
-	root, err := getRootPath()
+	root, err := os.Getwd()
 	if err != nil {
 		log.Println("error when getting root path: ", err)
 		return ""

@@ -189,15 +189,6 @@ func main() {
 `, string(output))
 }
 
-func TestGetRootPath(t *testing.T) {
-	asserts := assert.New(t)
-
-	path, err := getRootPath()
-
-	asserts.Nil(err)
-	asserts.Contains(path, "goimportssort")
-}
-
 func TestGetModuleName(t *testing.T) {
 	asserts := assert.New(t)
 
