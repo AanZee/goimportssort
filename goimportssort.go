@@ -19,6 +19,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
@@ -34,6 +35,8 @@ var (
 	localPrefix      = flag.String("local", "", "put imports beginning with this string after 3rd-party packages; comma-separated list")
 	verbose          bool // verbose logging
 	standardPackages = make(map[string]struct{})
+	wg sync.WaitGroup
+	buffer = make(chan string)
 )
 
 // impModel is used for storing import information
@@ -55,10 +58,18 @@ func (m impModel) string() string {
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go startFileWorkers(buffer)
+	}
+
 	err := goImportsSortMain()
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	close(buffer)
+	wg.Wait()
 }
 
 // goImportsSortMain checks passed flags and starts processing files
@@ -125,10 +136,26 @@ func isGoFile(f os.FileInfo) bool {
 func walkDir(path string) error {
 	return filepath.Walk(path, func(path string, f os.FileInfo, err error) error {
 		if err == nil && isGoFile(f) {
-			_, err = processFile(path, nil, os.Stdout)
+			buffer <- path
 		}
 		return err
 	})
+}
+
+func startFileWorkers(buffer chan string) {
+	for {
+		path, ok := <- buffer
+		if !ok { // if there is nothing to do and the channel has been closed then end the goroutine
+			wg.Done()
+			return
+		}
+
+		_, err := processFile(path, nil, os.Stdout)
+		if err != nil {
+			log.Println("error when processing file:", path)
+			log.Println(err)
+		}
+	}
 }
 
 // processFile reads a file and processes the content, then checks if they're equal.
