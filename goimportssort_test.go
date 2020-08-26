@@ -195,7 +195,7 @@ func TestGetRootPath(t *testing.T) {
 	path, err := getRootPath()
 
 	asserts.Nil(err)
-	asserts.Contains(path, "/goimportssort")
+	asserts.Contains(path, "goimportssort")
 }
 
 func TestGetModuleName(t *testing.T) {
