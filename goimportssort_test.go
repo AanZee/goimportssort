@@ -166,7 +166,8 @@ func TestProcessFile_WronglyFormattedGo(t *testing.T) {
 	*localPrefix = "github.com/AanZee/goimportssort"
 
 	reader := strings.NewReader(
-		`import "github.com/AanZee/goimportssort/package1"
+		`package main
+import "github.com/AanZee/goimportssort/package1"
 
 
 func main() {
