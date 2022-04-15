@@ -291,6 +291,25 @@ func countImports(impModels [][]impModel) int {
 func convertImportsToSlice(node *dst.File) ([][]impModel, error) {
 	importCategories := make([][]impModel, 3)
 
+	inbuild := &importCategories[0]
+	external := &importCategories[1]
+	local := &importCategories[2]
+	if sortString(*order) == sortString("iel") {
+		chars := []rune(*order)
+		for i := 0; i < 3; i++ {
+			switch chars[i] {
+			case 'l':
+				local = &importCategories[i]
+			case 'e':
+				external = &importCategories[i]
+			case 'i':
+				inbuild = &importCategories[i]
+			default:
+				return importCategories, fmt.Errorf("cannot parse the order argument given: %s", *order)
+			}
+		}
+	}
+
 	for _, importSpec := range node.Imports {
 		impName := importSpec.Path.Value
 		impNameWithoutQuotes := strings.Trim(impName, "\"")
@@ -301,25 +320,6 @@ func convertImportsToSlice(node *dst.File) ([][]impModel, error) {
 			locImpModel.localReference = locName.Name
 		}
 		locImpModel.path = impName
-
-		inbuild := &importCategories[0]
-		external := &importCategories[1]
-		local := &importCategories[2]
-		if sortString(*order) == sortString("iel") {
-			chars := []rune(*order)
-			for i := 0; i < 2; i++ {
-				switch chars[i] {
-				case 'l':
-					local = &importCategories[i]
-				case 'e':
-					external = &importCategories[i]
-				case 'i':
-					inbuild = &importCategories[i]
-				default:
-					return importCategories, fmt.Errorf("cannot parse the order argument given: %s", *order)
-				}
-			}
-		}
 
 		if *localPrefix != "" && strings.Count(impName, *localPrefix) > 0 {
 			*local = append(*local, locImpModel)
