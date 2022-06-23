@@ -32,8 +32,11 @@ var (
 	list             = flag.Bool("l", false, "write results to stdout")
 	write            = flag.Bool("w", false, "write result to (source) file instead of stdout")
 	localPrefix      = flag.String("local", "", "put imports beginning with this string after 3rd-party packages; comma-separated list")
+	winLines         = flag.Bool("win", false, "replace windows line breaks to unix format")
 	verbose          bool // verbose logging
 	standardPackages = make(map[string]struct{})
+	newLineWin       = []byte("\r\n")
+	newLineUnix      = []byte("\n")
 )
 
 // impModel is used for storing import information
@@ -147,6 +150,10 @@ func processFile(filename string, in io.Reader, out io.Writer) ([]byte, error) {
 	src, err := ioutil.ReadAll(in)
 	if err != nil {
 		return nil, err
+	}
+
+	if *winLines {
+		src = bytes.Replace(src, newLineWin, newLineUnix, -1)
 	}
 
 	res, err := process(src)

@@ -26,6 +26,7 @@ usage: goimportssort [flags] [path ...]
 (default tries to get module name of current directory)
   -v    verbose logging (default false)
   -w    write result to (source) file (default false)
+  -win  replace windows line breaks to unix format (otherwise all line breaks will be removed)
 ```
 Imports will be sorted according to their categories.
 ```
