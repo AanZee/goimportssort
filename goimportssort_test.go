@@ -99,6 +99,53 @@ func main() {
 `, string(output))
 }
 
+func TestProcessFile_GenericsSupport(t *testing.T) {
+	asserts := assert.New(t)
+	*localPrefix = "github.com/AanZee/goimportssort"
+
+	reader := strings.NewReader(
+		`package main
+
+
+import "github.com/AanZee/goimportssort/package1"
+
+func filter[T any](ss []T, test func(T) bool) (ret []T) {
+	for _, s := range ss {
+		if test(s) {
+			ret = append(ret, s)
+		}
+	}
+	return
+}
+
+func main() {
+	fmt.Println("Hello!")
+}`)
+	output, err := processFile("", reader, os.Stdout)
+	asserts.NotEqual(nil, output)
+	asserts.Equal(nil, err)
+	asserts.Equal(
+		`package main
+
+import (
+	"github.com/AanZee/goimportssort/package1"
+)
+
+func filter[T any](ss []T, test func(T) bool) (ret []T) {
+	for _, s := range ss {
+		if test(s) {
+			ret = append(ret, s)
+		}
+	}
+	return
+}
+
+func main() {
+	fmt.Println("Hello!")
+}
+`, string(output))
+}
+
 func TestProcessFile_EmptyImport(t *testing.T) {
 	asserts := assert.New(t)
 	*localPrefix = "github.com/AanZee/goimportssort"
